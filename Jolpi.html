@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>F1 Dashboard</title>
+  <link href="jolpi.css" rel="stylesheet" type="text/css">
+
+</head>
+<body>
+  <header>
+    <h1> F1 Dashboard</h1>
+    <p>Data from Jolpi.ca Ergast API</p>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <h2>Latest Race Results</h2>
+      <div id="race-info">Loading race info...</div>
+      <ul id="results-list"></ul>
+    </div>
+
+    <div class="card">
+      <h2>Driver Standings</h2>
+      <div id="season">Loading season...</div>
+      <ul id="standings"></ul>
+    </div>
+  </div>
+
+
+  <div id="overlay"></div>
+  <div id="popup">
+    <h3 id="popup-name"></h3>
+    <p id="popup-info"></p>
+    <button id="close">Close</button>
+  </div>
+<script>
+const baseUrl = "https://api.jolpi.ca/ergast/f1";
+
+    async function getData(url) {
+      let res = await fetch(url);
+      if (!res.ok) throw new Error("Fetch error: " + res.status);
+      return await res.json();
+    }
+
+    async function loadRace() {
+      const info = document.getElementById("race-info");
+      const list = document.getElementById("results-list");
+      try {
+        let data = await getData(baseUrl + "/current/last/results.json");
+        let race = data.MRData.RaceTable.Races[0];
+        info.innerHTML = `<b>${race.raceName}</b><br>${race.Circuit.circuitName}<br>${race.Circuit.Location.locality}, ${race.Circuit.Location.country} (${race.date})`;
+
+        list.innerHTML = race.Results.slice(0, 10).map(r => `
+          <li>
+            <span>#${r.position}</span>
+            <span class="driver-name" data-driver='${JSON.stringify(r.Driver)}'>
+              ${r.Driver.givenName} ${r.Driver.familyName}
+            </span>
+            <span>${r.Constructor.name}</span>
+          </li>
+        `).join("");
+
+        document.querySelectorAll(".driver-name").forEach(el => {
+          el.addEventListener("click", e => {
+            let driver = JSON.parse(e.target.getAttribute("data-driver"));
+            showPopup(driver);
+          });
+        });
+
+      } catch (err) {
+        info.textContent = "Could not load race data.";
+        console.error(err);
+      }
+    }
+
+    async function loadStandings() {
+      const seasonText = document.getElementById("season");
+      const list = document.getElementById("standings");
+      try {
+        let data = await getData(baseUrl + "/current/driverStandings.json");
+        let standings = data.MRData.StandingsTable.StandingsLists[0];
+        seasonText.textContent = "Season " + standings.season;
+
+        list.innerHTML = standings.DriverStandings.slice(0, 10).map(s => `
+          <li>
+            <span>${s.position}.</span>
+            <span class="driver-name" data-driver='${JSON.stringify(s.Driver)}'>
+              ${s.Driver.givenName} ${s.Driver.familyName}
+            </span>
+            <span>${s.points} pts</span>
+          </li>
+        `).join("");
+
+        document.querySelectorAll(".driver-name").forEach(el => {
+          el.addEventListener("click", e => {
+            let driver = JSON.parse(e.target.getAttribute("data-driver"));
+            showPopup(driver);
+          });
+        });
+
+      }   catch (err) {
+        seasonText.textContent = "Could not load standings.";
+        console.error(err);
+      }
+    }
+
+    function showPopup(driver) {
+      const popup = document.getElementById("popup");
+      const overlay = document.getElementById("overlay");
+      document.getElementById("popup-name").textContent = driver.givenName + " " + driver.familyName;
+      document.getElementById("popup-info").innerHTML = `
+        Nationality: ${driver.nationality}<br>
+        Code: ${driver.code || "N/A"}<br>
+        Permanent Number: ${driver.permanentNumber || "N/A"}
+      `;
+      popup.style.display = "block";
+      overlay.style.display = "block";
+    }
+
+    function closePopup() {
+      document.getElementById("popup").style.display = "none";
+      document.getElementById("overlay").style.display = "none";
+    }
+
+    document.getElementById("close").addEventListener("click", closePopup);
+    document.getElementById("overlay").addEventListener("click", closePopup);
+
+    loadRace();
+    loadStandings();
+</script>
+
+</body>
+</html>
